@@ -6,10 +6,11 @@
 # ///
 """scout_one.py HOST: watch one host and keep one sidecar per vLLM / SGLang server on it.
 
-scout.py starts one per host. Every round: forget the sidecars that exited; then, if a running job on HOST is new,
-requeued or still in its grace window, sweep every port of HOST and start a sidecar for each server that has none.
-A job's grace window starts when the first full sweep after it appeared ends. Each port check holds one of the node's
-slots, shared by every scout_one on the node (fleet_semaphore.py sets how many)."""
+scout.py starts one per host. Every round: forget the sidecars that exited; then, if every running job on HOST belongs
+to an opted-in user and one of them is new, requeued or still in its grace window, sweep every port of HOST and start
+a sidecar for each server that has none. A job's grace window starts when the first full sweep after it appeared ends.
+Each port check holds one of the node's slots, shared by every scout_one on the node (fleet_semaphore.py sets how
+many)."""
 import asyncio, json, os, socket, subprocess, sys, time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,12 +30,14 @@ COMMON_PORTS = [8000, 30000, 8080, 8001, 30001, 8810]
 PORTS = list(dict.fromkeys(COMMON_PORTS + list(range(1024, 65536))))   # most servers sit in 1024-32767
 SIDECAR = Path(__file__).with_name("sidecar.py")
 LOG = Path(__file__).parents[1] / "logs" / f"{CLUSTER}.jsonl"
+OPTED_IN = Path(__file__).parents[1] / "opted_in.txt"   # one username per line; read every round, so edits apply live
 CLIENT = httpx.AsyncClient(timeout=PROBE_TIMEOUT, trust_env=False)
 
 
 @dataclass
 class SeenJob:
     started: str                                  # Slurm start time: a requeued job keeps its id but not this
+    user: str                                     # whose job: only opted-in users' jobs make HOST due
     since: float | None = None                    # start of its grace window; None until a full sweep ends
 
 
@@ -54,8 +57,11 @@ def log(event, url="", **fields):
 
 
 def due(state: State) -> bool:
-    """Whether HOST needs a sweep: a running job on it is new, requeued, or in its grace window. Updates state.jobs
-    on the way, and logs each new or requeued job once (with its user and name, so later lines carry only ids)."""
+    """Whether HOST needs a sweep: every running job on it belongs to a user in OPTED_IN, and one of them is new,
+    requeued, or in its grace window. Every job counts, not only opted-in ones: a sweep finds every server on HOST and
+    can't tell whose job each belongs to, so one job of anyone else keeps HOST out. Updates state.jobs on the way, and
+    logs each new or requeued job once (with its user and name, so later lines carry only ids)."""
+    opted_in = set(OPTED_IN.read_text().split())
     out = subprocess.run(["squeue", "-h", "-t", "R", "-w", HOST, "-O", "JobID:|,StartTime:|,UserName:|,Name:"],
                          capture_output=True, text=True, check=True).stdout
     jobs = {}
@@ -63,11 +69,12 @@ def due(state: State) -> bool:
         job, started, user, job_name = line.split("|", 3)          # Name last: it may hold "|"
         seen = state.jobs.get(job)
         if seen is None or seen.started != started:
-            seen = SeenJob(started)
+            seen = SeenJob(started, user)
             log("job", job=job, user=user, job_name=job_name, started=started)
         jobs[job] = seen
     state.jobs = jobs
-    return any(seen.since is None or time.time() - seen.since < GRACE for seen in jobs.values())
+    return (all(seen.user in opted_in for seen in jobs.values())
+            and any(seen.since is None or time.time() - seen.since < GRACE for seen in jobs.values()))
 
 
 async def run_limited(fn, items, limit):

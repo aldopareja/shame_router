@@ -4,3 +4,4 @@ tailscale_relay/
 slurm-*.out
 docs/
 __pycache__/
+opted_in.txt
