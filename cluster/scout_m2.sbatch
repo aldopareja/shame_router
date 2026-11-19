@@ -18,4 +18,4 @@
 #SBATCH --cpus-per-task=20
 #SBATCH --mem=128G
 #SBATCH --time=UNLIMITED
-CLUSTER=m2 SLOTS_TOTAL=32000 exec uv run --script cluster/scout.py
+CLUSTER=m2 SLOTS_TOTAL=1000 exec uv run --script cluster/scout.py

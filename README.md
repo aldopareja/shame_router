@@ -29,9 +29,11 @@ On each cluster's login node, in a shell with `uv` on its PATH:
    ```
 2. Fill `.env` from `.env.example` (the same file as on the gateway), and link it for the relay:
    `ln -s ../.env tailscale_relay/.env`.
-3. Write `opted_in.txt` in the repo root: one cluster username per line, the users whose idle servers may be lent.
-   A node is swept only while every job on it belongs to one of them. The scout reads the file every round, so edits
-   apply within 5 min; servers already lent stay until their sidecars exit.
+3. Write `opted_in.txt` in the repo root (git-ignored, like `.env`, since it names people): one cluster username per
+   line, the users whose idle servers may be lent. It must exist before the scout starts: an empty file sweeps nothing,
+   and a missing one stops every node's scout at its first round. A node is swept only while every job on it belongs
+   to one of them. The scout reads the file every round, so edits apply within 5 min; servers already lent stay until
+   their sidecars exit.
 4. Check that the `#SBATCH` lines in `cluster/scout_m1.sbatch` or `cluster/scout_m2.sbatch` (partition, account, QOS,
    memory) fit your cluster, then submit from the repo root: `sbatch cluster/scout_m1.sbatch`.
 
