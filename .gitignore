@@ -1,0 +1,6 @@
+.env
+logs/
+tailscale_relay/
+slurm-*.out
+docs/
+__pycache__/

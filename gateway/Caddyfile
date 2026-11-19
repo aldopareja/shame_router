@@ -1,0 +1,15 @@
+# Caddyfile: gateway.sh fills in the box's public name and the gateway token, then installs this as /etc/caddy/Caddyfile.
+# https://<name>/<rest> goes to the router (shame-router.service on 127.0.0.1:30000) for callers that send the token;
+# anyone else gets 403. The token is taken off first, because smg passes a caller's Authorization on to its workers and
+# from there it would reach owners' servers. Caddy gets the certificate itself, streams replies as they arrive, and
+# adds no time or size limit of its own, so the router's 2 h and 1 GiB are the limits.
+$GATEWAY_HOST {
+	@token header Authorization "Bearer $GATEWAY_TOKEN"
+	handle @token {
+		reverse_proxy 127.0.0.1:30000 {
+			header_up -Authorization
+			flush_interval -1
+		}
+	}
+	respond 403
+}

@@ -1,0 +1,34 @@
+# shame-router.service: the router, the latest smg, on 127.0.0.1:30000 only (its metrics too), so Caddy is the only
+# way in. It starts with no workers: sidecars add and remove themselves through its /workers API. Health checks are
+# lenient (30 s timeout, unhealthy after 5 misses 30 s apart) because SGLang's /health generates a token and can take
+# seconds under load; a worker that stays unhealthy is removed, and its sidecar adds itself back once healthy. Long
+# agent calls get 2 h, 1 GiB bodies and a 3 GiB-character cache tree per model. Up to 16,384 requests are open at once
+# on any box size; the next 100 wait up to 60 s for a slot (then 503), and any beyond those get 429. The router leaves
+# closing idle connections to Caddy (2 min), so Caddy never sends a request on one the router is closing; one Caddy
+# opened but never used still goes after 5 min. gateway.sh installs it.
+[Unit]
+Description=shame router (smg)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=HOME=/root
+ExecStart=/usr/local/bin/uvx --from smg@latest smg launch \
+  --host 127.0.0.1 \
+  --port 30000 \
+  --prometheus-host 127.0.0.1 \
+  --request-timeout-secs 7200 \
+  --max-payload-size 1073741824 \
+  --max-tree-size 3221225472 \
+  --max-concurrent-requests 16384 \
+  --idle-connection-timeout-secs 0 \
+  --header-read-timeout-secs 300 \
+  --health-check-timeout-secs 30 \
+  --health-check-interval-secs 30 \
+  --health-failure-threshold 5 \
+  --remove-unhealthy-workers
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
