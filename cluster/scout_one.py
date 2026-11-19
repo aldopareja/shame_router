@@ -26,8 +26,11 @@ GRACE = 60 * 60                                   # seconds a job's host keeps b
 PROBE_TIMEOUT = 3                                 # seconds per connection attempt or HTTP request
 IN_FLIGHT = 1024                                  # port checks at once on this host, as the node's slots allow
 ENGINES = {"vllm", "vllm-frontend-rs", "sglang"}  # owned_by in /v1/models; routers and gateways say something else
-COMMON_PORTS = [8000, 30000, 8080, 8001, 30001, 8810]
-PORTS = list(dict.fromkeys(COMMON_PORTS + list(range(1024, 65536))))   # most servers sit in 1024-32767
+# Swept first: the ranges where servers turned up most often. Every other port follows, so none is skipped.
+FIRST_PORTS = [range(8000, 9001), range(30000, 30300), range(19100, 19200), range(23000, 24000), range(31000, 31200),
+               range(32000, 32100), range(33000, 40000, 1000), range(15000, 15100), range(17500, 17600),
+               range(18000, 18100), range(39100, 39200)]
+PORTS = list(dict.fromkeys([port for ports in FIRST_PORTS for port in ports] + list(range(1024, 65536))))
 SIDECAR = Path(__file__).with_name("sidecar.py")
 LOG = Path(__file__).parents[1] / "logs" / f"{CLUSTER}.jsonl"
 OPTED_IN = Path(__file__).parents[1] / "opted_in.txt"   # one username per line; read every round, so edits apply live
