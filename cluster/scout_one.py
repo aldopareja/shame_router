@@ -22,7 +22,7 @@ from fleet_semaphore import SemState, open_slots, slot
 HOST = sys.argv[1]
 CLUSTER = os.environ["CLUSTER"]
 ROUND = 300                                       # seconds between this host's rounds
-GRACE = 30 * 60                                   # seconds a job's host keeps being swept after its first full sweep
+GRACE = 60 * 60                                   # seconds a job's host keeps being swept after its first full sweep
 PROBE_TIMEOUT = 3                                 # seconds per connection attempt or HTTP request
 IN_FLIGHT = 1024                                  # port checks at once on this host, as the node's slots allow
 ENGINES = {"vllm", "vllm-frontend-rs", "sglang"}  # owned_by in /v1/models; routers and gateways say something else
